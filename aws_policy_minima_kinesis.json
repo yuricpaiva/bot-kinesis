@@ -1,0 +1,15 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "kinesis:DescribeStreamSummary",
+        "kinesis:ListShards",
+        "kinesis:GetShardIterator",
+        "kinesis:GetRecords"
+      ],
+      "Resource": "arn:aws:kinesis:us-east-2:250220835987:stream/backoffice-prod-exporter-emporiobrownie"
+    }
+  ]
+}
