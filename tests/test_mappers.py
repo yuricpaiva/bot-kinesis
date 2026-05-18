@@ -17,7 +17,12 @@ def base_payload():
         "creationDttm": "2026-05-14T00:30:00+00:00",
         "posUser": {"name": "Operador"},
         "totalTender": 99.99,
-        "totalAmount": 24.43,
+        "totalAmount": 88.88,
+        "fiscalXml": (
+            "<nfeProc xmlns=\"http://www.portalfiscal.inf.br/nfe\">"
+            "<NFe><infNFe><total><ICMSTot><vNF>24.43</vNF></ICMSTot>"
+            "</total></infNFe></NFe></nfeProc>"
+        ),
         "discountAmount": 1.5,
         "customProperties": {"FISCAL_ID": "12345", "POS_TYPE": "FC"},
         "benefitData": [{"code": "A"}, {"code": "B"}],
@@ -80,6 +85,25 @@ def test_void_paid_order_com_fiscal_cancel_marca_cancelado():
     assert mapped.venda["cancelado"] is True
     assert mapped.cancelamento is not None
     assert mapped.cancelamento["numero_cupom"] == "12345"
+
+
+def test_total_venda_usa_vnf_do_xml_fiscal():
+    payload = base_payload()
+    payload["totalAmount"] = 88.88
+    payload["totalTender"] = 99.99
+
+    mapped = map_order_picture(payload, TZ)
+
+    assert mapped.venda["total_venda"] == Decimal("24.43")
+
+
+def test_total_venda_fica_nulo_quando_xml_nao_tem_vnf():
+    payload = base_payload()
+    payload["fiscalXml"] = "<xml />"
+
+    mapped = map_order_picture(payload, TZ)
+
+    assert mapped.venda["total_venda"] is None
 
 
 def test_sem_fiscal_id_cria_venda_pela_chave_operacional():

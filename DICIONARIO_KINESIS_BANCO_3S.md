@@ -507,7 +507,7 @@ Uma linha por venda/evento `order_picture`, exceto eventos `VOID_CURRENT_ORDER`,
 | tipo de venda | primeiro valor encontrado em `saleLines[].customProperties.saleType` |
 | tipo de pdv | `customProperties.POS_TYPE` |
 | atendente | `posUser.name` |
-| total de venda | `totalAmount` |
+| total de venda | `vNF` dentro do XML fiscal (`fiscalXml`) |
 | desconto | `discountAmount` |
 | codigo do desconto | juntar `benefitData[].code` separado por virgula |
 
@@ -552,4 +552,4 @@ Uma linha por venda cancelada. Considerar venda cancelada quando `fiscalXmlCance
 | tipo de venda | primeiro valor encontrado em `saleLines[].customProperties.saleType` |
 | tipo de pdv | `customProperties.POS_TYPE` |
 | atendente | `posUser.name` |
-| total de venda | `totalAmount` |
+| total de venda | `vNF` dentro do XML fiscal (`fiscalXml`) |

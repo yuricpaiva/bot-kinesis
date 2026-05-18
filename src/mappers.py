@@ -10,6 +10,7 @@ from .utils import (
     to_business_naive,
     to_decimal,
     to_text,
+    xml_vnf,
 )
 
 
@@ -53,7 +54,7 @@ def map_order_picture(payload: dict[str, Any], timezone_name: str) -> MappedOrde
         "tipo_venda": tipo_venda,
         "tipo_pdv": tipo_pdv,
         "atendente": atendente,
-        "total_venda": to_decimal(payload.get("totalAmount")),
+        "total_venda": _total_venda_from_xml(payload),
         "desconto": to_decimal(payload.get("discountAmount")),
         "codigo_desconto": join_benefit_codes(payload.get("benefitData")),
         "cancelado": fiscal_cancel,
@@ -129,6 +130,19 @@ def _map_cancelamento(venda: dict[str, Any]) -> dict[str, Any]:
         "atendente": venda["atendente"],
         "total_venda": venda["total_venda"],
     }
+
+
+def _total_venda_from_xml(payload: dict[str, Any]) -> Any:
+    for field_name in (
+        "fiscalXml",
+        "fiscalXmlNfe",
+        "fiscalXmlCancel",
+        "fiscalXmlNfeCancel",
+    ):
+        value = xml_vnf(payload.get(field_name))
+        if value is not None:
+            return value
+    return None
 
 
 def _attendant_name(pos_user: Any) -> str | None:

@@ -2,6 +2,7 @@ import json
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any
+from xml.etree import ElementTree
 from zoneinfo import ZoneInfo
 
 
@@ -80,6 +81,21 @@ def to_decimal(value: Any) -> Decimal | None:
         return Decimal(str(value))
     except (InvalidOperation, ValueError):
         return None
+
+
+def xml_vnf(xml_text: Any) -> Decimal | None:
+    if not isinstance(xml_text, str) or not xml_text.strip():
+        return None
+    try:
+        root = ElementTree.fromstring(xml_text)
+    except ElementTree.ParseError:
+        return None
+
+    for element in root.iter():
+        tag_name = element.tag.rsplit("}", maxsplit=1)[-1]
+        if tag_name == "vNF":
+            return to_decimal(element.text)
+    return None
 
 
 def to_text(value: Any) -> str | None:
