@@ -1,6 +1,7 @@
 import argparse
 import logging
 import time
+from dataclasses import dataclass
 from typing import Any
 
 from .config import load_config
@@ -84,8 +85,20 @@ DO UPDATE SET
     codigo_desconto = EXCLUDED.codigo_desconto,
     cancelado = dw.vendas.cancelado OR EXCLUDED.cancelado,
     updated_at = NOW()
-RETURNING id, cancelado
+RETURNING id, (xmax::text = '0') AS inserted, cancelado
 """
+
+
+@dataclass(frozen=True)
+class SaveResult:
+    venda_id: int
+    venda_inserted: bool
+    pagamentos_removed: int
+    pagamentos_inserted: int
+    produtos_removed: int
+    produtos_inserted: int
+    cancelamentos_removed: int
+    cancelamentos_inserted: int
 
 
 def main() -> None:
@@ -144,22 +157,48 @@ def process_one(conn, raw_id: int, timezone_name: str) -> None:
         if mapped.skip_dw:
             cur.execute(MARK_PROCESSED_SQL, (raw_id,))
             conn.commit()
-            LOGGER.info("RAW id=%s ignorado no DW: %s.", raw_id, mapped.skip_reason)
+            if mapped.skip_reason == "VOID_CURRENT_ORDER":
+                LOGGER.info("RAW id=%s ignorado por VOID_CURRENT_ORDER.", raw_id)
+            else:
+                LOGGER.info("RAW id=%s ignorado no DW: %s.", raw_id, mapped.skip_reason)
             return
 
-        save_mapped_order(cur, mapped)
+        result = save_mapped_order(cur, mapped)
         cur.execute(MARK_PROCESSED_SQL, (raw_id,))
         conn.commit()
-        LOGGER.info("RAW id=%s processado no DW.", raw_id)
+        venda = mapped.venda or {}
+        action = "inserida" if result.venda_inserted else "atualizada"
+        LOGGER.info(
+            "RAW id=%s processado no DW: venda_id=%s venda=%s "
+            "loja=%s data_movimento=%s numero_pedido=%s "
+            "pagamentos removidos=%s reinseridos=%s "
+            "produtos removidos=%s reinseridos=%s "
+            "cancelamentos removidos=%s reinseridos=%s.",
+            raw_id,
+            result.venda_id,
+            action,
+            venda.get("loja"),
+            venda.get("data_movimento"),
+            venda.get("numero_pedido"),
+            result.pagamentos_removed,
+            result.pagamentos_inserted,
+            result.produtos_removed,
+            result.produtos_inserted,
+            result.cancelamentos_removed,
+            result.cancelamentos_inserted,
+        )
 
 
-def save_mapped_order(cur, mapped: MappedOrder) -> int:
+def save_mapped_order(cur, mapped: MappedOrder) -> SaveResult:
     if mapped.venda is None:
         raise ValueError("Mapeamento sem venda para salvar.")
     cur.execute(UPSERT_VENDA_SQL, mapped.venda)
-    venda_id = cur.fetchone()["id"]
+    upserted_venda = cur.fetchone()
+    venda_id = upserted_venda["id"]
+    venda_inserted = bool(upserted_venda["inserted"])
 
     cur.execute("DELETE FROM dw.pagamentos WHERE venda_id = %s", (venda_id,))
+    pagamentos_removed = _affected_rows(cur)
     for pagamento in mapped.pagamentos:
         cur.execute(
             """
@@ -186,6 +225,7 @@ def save_mapped_order(cur, mapped: MappedOrder) -> int:
         )
 
     cur.execute("DELETE FROM dw.produtos WHERE venda_id = %s", (venda_id,))
+    produtos_removed = _affected_rows(cur)
     for produto in mapped.produtos:
         cur.execute(
             """
@@ -221,40 +261,55 @@ def save_mapped_order(cur, mapped: MappedOrder) -> int:
             {"venda_id": venda_id, **produto},
         )
 
+    cancelamentos_removed = 0
+    cancelamentos_inserted = 0
     if mapped.cancelamento is not None:
+        cur.execute("DELETE FROM dw.cancelamentos WHERE venda_id = %s", (venda_id,))
+        cancelamentos_removed = _affected_rows(cur)
         cur.execute(
-            "SELECT id FROM dw.cancelamentos WHERE venda_id = %s LIMIT 1",
-            (venda_id,),
-        )
-        if cur.fetchone() is None:
-            cur.execute(
-                """
-                INSERT INTO dw.cancelamentos (
-                    venda_id,
-                    loja,
-                    data_hora,
-                    numero_cupom,
-                    numero_pedido,
-                    tipo_venda,
-                    tipo_pdv,
-                    atendente,
-                    total_venda
-                )
-                VALUES (
-                    %(venda_id)s,
-                    %(loja)s,
-                    %(data_hora)s,
-                    %(numero_cupom)s,
-                    %(numero_pedido)s,
-                    %(tipo_venda)s,
-                    %(tipo_pdv)s,
-                    %(atendente)s,
-                    %(total_venda)s
-                )
-                """,
-                {"venda_id": venda_id, **mapped.cancelamento},
+            """
+            INSERT INTO dw.cancelamentos (
+                venda_id,
+                loja,
+                data_hora,
+                numero_cupom,
+                numero_pedido,
+                tipo_venda,
+                tipo_pdv,
+                atendente,
+                total_venda
             )
-    return venda_id
+            VALUES (
+                %(venda_id)s,
+                %(loja)s,
+                %(data_hora)s,
+                %(numero_cupom)s,
+                %(numero_pedido)s,
+                %(tipo_venda)s,
+                %(tipo_pdv)s,
+                %(atendente)s,
+                %(total_venda)s
+            )
+            """,
+            {"venda_id": venda_id, **mapped.cancelamento},
+        )
+        cancelamentos_inserted = 1
+
+    return SaveResult(
+        venda_id=venda_id,
+        venda_inserted=venda_inserted,
+        pagamentos_removed=pagamentos_removed,
+        pagamentos_inserted=len(mapped.pagamentos),
+        produtos_removed=produtos_removed,
+        produtos_inserted=len(mapped.produtos),
+        cancelamentos_removed=cancelamentos_removed,
+        cancelamentos_inserted=cancelamentos_inserted,
+    )
+
+
+def _affected_rows(cur) -> int:
+    rowcount = getattr(cur, "rowcount", -1)
+    return rowcount if rowcount and rowcount > 0 else 0
 
 
 def mark_error(conn, raw_id: int, message: str) -> None:
