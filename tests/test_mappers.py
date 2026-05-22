@@ -33,6 +33,7 @@ def base_payload():
                 "name": "Produto teste",
                 "itemType": "PRODUCT",
                 "itemId": "1.10020",
+                "itemPrice": 14.9,
                 "tags": ["PLUFamilyGroup=BROWNIE"],
                 "customProperties": {"saleType": "EAT_IN"},
             }
@@ -58,6 +59,16 @@ def test_venda_normal_gera_venda_pagamentos_e_produtos():
     assert len(mapped.pagamentos) == 1
     assert len(mapped.produtos) == 1
     assert mapped.produtos[0]["familia_item"] == "BROWNIE"
+    assert mapped.produtos[0]["preco_item"] == Decimal("14.9")
+
+
+def test_produto_sem_item_price_grava_preco_item_nulo():
+    payload = base_payload()
+    payload["saleLines"][0].pop("itemPrice")
+
+    mapped = map_order_picture(payload, TZ)
+
+    assert mapped.produtos[0]["preco_item"] is None
 
 
 def test_void_current_order_ignora_dw():
@@ -83,6 +94,7 @@ def test_void_paid_order_com_fiscal_cancel_marca_cancelado():
 
     assert mapped.skip_dw is False
     assert mapped.venda["cancelado"] is True
+    assert mapped.produtos == []
     assert mapped.cancelamento is not None
     assert mapped.cancelamento["numero_cupom"] == "12345"
 

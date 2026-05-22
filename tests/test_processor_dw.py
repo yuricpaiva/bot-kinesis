@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from src.mappers import map_order_picture
 from src.processor_dw import UPSERT_VENDA_SQL, save_mapped_order
 from tests.test_mappers import TZ, base_payload
@@ -48,6 +50,7 @@ def test_save_mapped_order_substitui_filhos_quando_mesma_venda_chega_de_novo():
             "name": "Produto atualizado",
             "itemType": "PRODUCT",
             "itemId": "1.10021",
+            "itemPrice": 9.5,
             "tags": ["PLUFamilyGroup=COOKIE"],
             "customProperties": {"saleType": "EAT_IN"},
         }
@@ -89,9 +92,50 @@ def test_save_mapped_order_substitui_filhos_quando_mesma_venda_chega_de_novo():
     assert second_upsert_index < second_delete_produtos_index
     assert second_delete_produtos_index < second_insert_produto_index
 
+    produto_inserts = _matching_commands(cursor.commands, "INSERT INTO dw.produtos")
+    assert produto_inserts[0][1]["preco_item"] == Decimal("14.9")
+    assert produto_inserts[-1][1]["preco_item"] == Decimal("9.5")
+
+
+def test_save_mapped_order_cancelamento_remove_produtos_sem_reinserir():
+    cursor = FakeCursor()
+    first_payload = base_payload()
+    cancel_payload = base_payload()
+    cancel_payload["customProperties"]["VOID_TYPE"] = "VOID_PAID_ORDER"
+    cancel_payload["fiscalXmlCancel"] = "<xml />"
+
+    first = map_order_picture(first_payload, TZ)
+    cancel = map_order_picture(cancel_payload, TZ)
+
+    first_result = save_mapped_order(cursor, first)
+    cancel_result = save_mapped_order(cursor, cancel)
+
+    assert first_result.produtos_inserted == 1
+    assert cancel_result.produtos_removed == 1
+    assert cancel_result.produtos_inserted == 0
+    assert cancel_result.cancelamentos_inserted == 1
+
+    command_sql = [sql for sql, _ in cursor.commands]
+    assert _count_matching(command_sql, "INSERT INTO dw.produtos") == 1
+    second_delete_produtos_index = _nth_index(command_sql, "DELETE FROM dw.produtos", 2)
+    insert_cancelamento_index = _nth_index(command_sql, "INSERT INTO dw.cancelamentos", 1)
+    assert second_delete_produtos_index < insert_cancelamento_index
+
 
 def _count_commands(commands, sql):
     return sum(1 for command_sql, _ in commands if command_sql == sql)
+
+
+def _count_matching(commands, pattern):
+    return sum(1 for command_sql in commands if pattern in command_sql)
+
+
+def _matching_commands(commands, pattern):
+    return [
+        (command_sql, params)
+        for command_sql, params in commands
+        if pattern in command_sql
+    ]
 
 
 def _nth_index(commands, pattern, occurrence):

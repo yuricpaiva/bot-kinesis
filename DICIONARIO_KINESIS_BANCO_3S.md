@@ -146,6 +146,7 @@ Criar uma linha por item de `saleLines[]`.
 | família do item | `saleLines[].tags` com prefixo `PLUFamilyGroup=` | Extrair somente o valor após `=`. |
 | quantidade | `saleLines[].qty` | Quantidade do item. |
 | quantidade multiplicada | `saleLines[].multipliedQty` | Útil em combos/adicionais. |
+| preco_item | `saleLines[].itemPrice` | Valor total decimal da linha do item; gravar NULL quando ausente/nulo. |
 | preço item | `saleLines[].itemPrice` | Valor do item. |
 | preço unitário | `saleLines[].unitPrice` | Valor unitário. |
 | desconto item | `saleLines[].itemDiscount` | Desconto do item. |
@@ -539,6 +540,7 @@ Uma linha por item de `saleLines[]`.
 | itemType | `saleLines[].itemType` |
 | itemID | `saleLines[].itemId` |
 | familia do item | valor de `saleLines[].tags[]` com prefixo `PLUFamilyGroup=` |
+| preco_item | `saleLines[].itemPrice` |
 
 ### Tabela `cancelamentos`
 

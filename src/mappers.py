@@ -61,7 +61,7 @@ def map_order_picture(payload: dict[str, Any], timezone_name: str) -> MappedOrde
     }
 
     pagamentos = _map_pagamentos(tenders, venda)
-    produtos = _map_produtos(sale_lines, venda, tipo_pdv)
+    produtos = [] if fiscal_cancel else _map_produtos(sale_lines, venda, tipo_pdv)
     cancelamento = _map_cancelamento(venda) if fiscal_cancel else None
     return MappedOrder(False, None, venda, pagamentos, produtos, cancelamento)
 
@@ -114,6 +114,7 @@ def _map_produtos(
                 "item_type": to_text(line.get("itemType")),
                 "item_id": to_text(line.get("itemId")),
                 "familia_item": extract_family(line.get("tags")),
+                "preco_item": to_decimal(line.get("itemPrice")),
             }
         )
     return rows
