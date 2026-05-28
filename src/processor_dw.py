@@ -105,14 +105,22 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser()
     parser.add_argument("--once", action="store_true", help="Processa um lote e encerra.")
+    parser.add_argument(
+        "--until-empty",
+        action="store_true",
+        help="Processa lotes ate nao haver mais eventos RAW pendentes e encerra.",
+    )
     args = parser.parse_args()
 
     config = load_config()
+    if args.once and args.until_empty:
+        parser.error("Use apenas uma opcao: --once ou --until-empty.")
+
     with connect(config.postgres) as conn:
         LOGGER.info("Processor DW iniciado.")
         while True:
             processed_count = process_batch(conn, config.raw_batch_size, config.timezone_name)
-            if args.once:
+            if args.once or (args.until_empty and processed_count == 0):
                 break
             if processed_count == 0:
                 time.sleep(config.processor_sleep_seconds)

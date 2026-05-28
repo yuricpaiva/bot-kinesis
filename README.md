@@ -68,6 +68,24 @@ Processar continuamente:
 python -m src.processor_dw
 ```
 
+Coletar tudo que ainda esta disponivel na retencao do Kinesis e encerrar:
+
+```bash
+SHARD_ITERATOR_TYPE=TRIM_HORIZON MAX_RECORDS_PER_READ=1000 python -m src.collector_raw --until-caught-up
+```
+
+Processar a RAW ate nao haver mais eventos pendentes e encerrar:
+
+```bash
+python -m src.processor_dw --until-empty
+```
+
+Rodar a carga noturna completa:
+
+```bash
+bash scripts/run_kinesis_nightly.sh
+```
+
 ## Responsabilidades
 
 `collector_raw.py`:

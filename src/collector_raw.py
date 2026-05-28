@@ -1,3 +1,4 @@
+import argparse
 import logging
 import time
 from typing import Any
@@ -16,6 +17,7 @@ from .utils import custom_properties, extract_payload, parse_record_data, to_tex
 
 
 LOGGER = logging.getLogger(__name__)
+DEFAULT_CAUGHT_UP_IDLE_ROUNDS = 3
 
 
 INSERT_RAW_SQL = """
@@ -47,6 +49,27 @@ ON CONFLICT (shard_id, sequence_number) DO NOTHING
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--until-caught-up",
+        action="store_true",
+        help="Le ate alcancar o fim do stream e encerra. Use com SHARD_ITERATOR_TYPE=TRIM_HORIZON.",
+    )
+    parser.add_argument(
+        "--caught-up-idle-rounds",
+        type=int,
+        default=DEFAULT_CAUGHT_UP_IDLE_ROUNDS,
+        help="Rodadas sem registros e sem atraso antes de encerrar no modo --until-caught-up.",
+    )
+    args = parser.parse_args()
+
+    collect_raw(
+        until_caught_up=args.until_caught_up,
+        caught_up_idle_rounds=args.caught_up_idle_rounds,
+    )
+
+
+def collect_raw(until_caught_up: bool = False, caught_up_idle_rounds: int = DEFAULT_CAUGHT_UP_IDLE_ROUNDS) -> None:
     config = load_config()
     kinesis_client = create_client(config.kinesis)
     summary = describe_stream(kinesis_client, config.kinesis.stream_name)
@@ -68,8 +91,10 @@ def main() -> None:
     }
     with connect(config.postgres) as conn:
         LOGGER.info("Collector RAW iniciado com %s shard(s).", len(shard_iterators))
+        idle_caught_up_rounds = 0
         while True:
             found_records = False
+            max_millis_behind_latest = 0
             for shard_id, shard_iterator in list(shard_iterators.items()):
                 if not shard_iterator:
                     LOGGER.warning("Shard %s sem proximo iterator.", shard_id)
@@ -79,6 +104,9 @@ def main() -> None:
                     Limit=config.kinesis.max_records_per_read,
                 )
                 shard_iterators[shard_id] = response.get("NextShardIterator")
+                millis_behind_latest = response.get("MillisBehindLatest")
+                if millis_behind_latest is not None:
+                    max_millis_behind_latest = max(max_millis_behind_latest, millis_behind_latest)
                 records = response.get("Records", [])
                 if not records:
                     continue
@@ -95,6 +123,20 @@ def main() -> None:
                             shard_id,
                             record.get("SequenceNumber"),
                         )
+            if until_caught_up:
+                active_iterators = [iterator for iterator in shard_iterators.values() if iterator]
+                if not found_records and max_millis_behind_latest == 0:
+                    idle_caught_up_rounds += 1
+                    LOGGER.info(
+                        "Sem novos eventos e sem atraso no Kinesis (%s/%s).",
+                        idle_caught_up_rounds,
+                        caught_up_idle_rounds,
+                    )
+                else:
+                    idle_caught_up_rounds = 0
+                if not active_iterators or idle_caught_up_rounds >= caught_up_idle_rounds:
+                    LOGGER.info("Collector RAW alcancou o fim disponivel do Kinesis e sera encerrado.")
+                    break
             if not found_records:
                 time.sleep(config.collector_sleep_seconds)
 
