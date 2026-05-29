@@ -47,6 +47,7 @@ INSERT INTO dw.vendas (
     loja,
     data_hora,
     data_movimento,
+    data_negocio,
     numero_cupom,
     numero_pedido,
     tipo_venda,
@@ -62,6 +63,7 @@ VALUES (
     %(loja)s,
     %(data_hora)s,
     %(data_movimento)s,
+    %(data_negocio)s,
     %(numero_cupom)s,
     %(numero_pedido)s,
     %(tipo_venda)s,
@@ -76,6 +78,7 @@ VALUES (
 ON CONFLICT (loja, data_movimento, numero_pedido)
 DO UPDATE SET
     data_hora = EXCLUDED.data_hora,
+    data_negocio = EXCLUDED.data_negocio,
     numero_cupom = COALESCE(EXCLUDED.numero_cupom, dw.vendas.numero_cupom),
     tipo_venda = EXCLUDED.tipo_venda,
     tipo_pdv = EXCLUDED.tipo_pdv,

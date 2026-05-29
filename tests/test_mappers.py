@@ -49,6 +49,7 @@ def test_venda_normal_gera_venda_pagamentos_e_produtos():
     assert mapped.skip_dw is False
     assert mapped.venda["loja"] == "0001"
     assert str(mapped.venda["data_movimento"]) == "2026-05-13"
+    assert str(mapped.venda["data_negocio"]) == "2026-05-14"
     assert mapped.venda["numero_cupom"] == "12345"
     assert mapped.venda["numero_pedido"] == "10609"
     assert mapped.venda["tipo_venda"] == "EAT_IN"
@@ -142,6 +143,7 @@ def test_sem_business_dt_nao_impede_chave_operacional():
 
     assert mapped.skip_dw is False
     assert str(mapped.venda["data_movimento"]) == "2026-05-13"
+    assert mapped.venda["data_negocio"] is None
 
 
 def test_sem_creation_dttm_ignora_por_chave_incompleta():

@@ -89,6 +89,7 @@ Ordem sugerida:
 | loja | `storeCode` | Código da loja. |
 | data e hora | `creationDttm` convertido para horário Brasil | `creationDttm` vem em UTC. |
 | data movimento | data de `creationDttm` convertido para `America/Fortaleza` | Nao usar `businessDt` como chave operacional do DW. |
+| data negocio | `businessDt` | Data operacional enviada pelo Kinesis, sem conversao de fuso. Nao faz parte da chave principal. |
 | numero do cupom | `customProperties.FISCAL_ID` | Cupom fiscal/NFC-e. |
 | numero do pedido | `orderCode` | Identificador interno da venda. |
 | canal de venda | `customProperties.DISPLAY_PARTNER` / `customProperties.PARTNER` / `saleLines[0].customProperties.saleType` | Ver regra de canal. |
@@ -504,6 +505,7 @@ Uma linha por venda/evento `order_picture`, exceto eventos `VOID_CURRENT_ORDER`,
 | loja | `storeCode` |
 | data e hora | `creationDttm` convertido para `America/Fortaleza` |
 | data movimento | data de `creationDttm` convertido para `America/Fortaleza` |
+| data negocio | `businessDt` |
 | numero do cupom | `customProperties.FISCAL_ID` |
 | tipo de venda | primeiro valor encontrado em `saleLines[].customProperties.saleType` |
 | tipo de pdv | `customProperties.POS_TYPE` |

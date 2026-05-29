@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import date
 from typing import Any
 
 from .utils import (
@@ -35,6 +36,7 @@ def map_order_picture(payload: dict[str, Any], timezone_name: str) -> MappedOrde
     tenders = payload.get("tenders")
     data_hora = to_business_naive(payload.get("creationDttm"), timezone_name)
     data_movimento = data_hora.date() if data_hora is not None else None
+    data_negocio = _business_date(payload.get("businessDt"))
     loja = to_text(payload.get("storeCode"))
     numero_pedido = to_text(payload.get("orderCode"))
     if not loja or data_movimento is None or not numero_pedido:
@@ -49,6 +51,7 @@ def map_order_picture(payload: dict[str, Any], timezone_name: str) -> MappedOrde
         "loja": loja,
         "data_hora": data_hora,
         "data_movimento": data_movimento,
+        "data_negocio": data_negocio,
         "numero_cupom": fiscal_id,
         "numero_pedido": numero_pedido,
         "tipo_venda": tipo_venda,
@@ -151,3 +154,13 @@ def _attendant_name(pos_user: Any) -> str | None:
     if isinstance(pos_user, dict):
         return to_text(pos_user.get("name"))
     return to_text(pos_user)
+
+
+def _business_date(value: Any) -> date | None:
+    text = to_text(value)
+    if not text:
+        return None
+    try:
+        return date.fromisoformat(text[:10])
+    except ValueError:
+        return None

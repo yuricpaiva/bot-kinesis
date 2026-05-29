@@ -124,7 +124,9 @@ data_movimento = DATE(data_hora)
 numero_pedido = orderCode
 ```
 
-Nao usar `FISCAL_ID`, `numero_cupom` ou `businessDt` como chave principal da venda.
+`data_negocio` guarda `businessDt` sem conversao de fuso, apenas como data operacional complementar.
+
+Nao usar `FISCAL_ID`, `numero_cupom`, `businessDt` ou `data_negocio` como chave principal da venda.
 
 `FISCAL_ID` alimenta `numero_cupom`, mas pode nascer vazio e aparecer depois.
 
