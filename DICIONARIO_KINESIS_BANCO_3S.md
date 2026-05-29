@@ -490,9 +490,10 @@ Estas sao as regras definidas para construir o script que vai ler os eventos `or
 - A familia do item deve ser extraida de `saleLines[].tags[]`, procurando a tag com prefixo `PLUFamilyGroup=` e mantendo somente o valor depois do `=`.
 - A tabela `pagamentos` deve gerar uma linha para cada item de `tenders[]`.
 - A tabela `produtos` deve gerar uma linha para cada item de `saleLines[]`.
-- A tabela `cancelamentos` deve receber apenas eventos onde `fiscalXmlCancel` estiver preenchido.
+- A tabela `cancelamentos` deve receber eventos onde `fiscalXmlCancel` estiver preenchido e tambem cancelamentos operacionais fortes de iFood sem cancelamento fiscal.
 - Eventos com `customProperties.VOID_TYPE = VOID_CURRENT_ORDER` devem ser ignorados nas tabelas principais `venda`, `pagamentos` e `produtos`, pois representam pedido cancelado antes de virar venda fiscal. Se necessario, gravar apenas em uma tabela/log de pedidos cancelados antes da venda.
 - Eventos com `customProperties.VOID_TYPE = VOID_PAID_ORDER` devem ser tratados como cancelamento de venda ja emitida/paga, atualizando a venda existente e alimentando `cancelamentos` quando `fiscalXmlCancel` estiver preenchido.
+- Eventos iFood com `stateId = 4`, `customProperties.VOID_AT` preenchido ou `customProperties.MANUAL_CANCELLATION` preenchido devem marcar `dw.vendas.cancelado = true`, mesmo quando `fiscalXmlCancel` estiver vazio. Nao usar `REMOTE_ORDER_STATUS = 5` sozinho como cancelamento confirmado.
 - A venda deve aceitar `numero_cupom` vazio/nulo e atualizar esse campo quando `FISCAL_ID` aparecer em evento posterior.
 - Cancelamento tem precedencia sobre venda aprovada: se a venda ja estiver marcada como cancelada, um evento posterior/reprocessado sem cancelamento nao deve reverter o status para aprovado.
 
@@ -547,7 +548,7 @@ Uma linha por item de `saleLines[]`.
 
 ### Tabela `cancelamentos`
 
-Uma linha por venda cancelada. Considerar venda cancelada quando `fiscalXmlCancel` estiver preenchido. Eventos `VOID_PAID_ORDER` com `fiscalXmlCancel` preenchido devem atualizar a venda existente como cancelada; eventos `VOID_CURRENT_ORDER` nao entram aqui, salvo se no futuro vierem acompanhados de cancelamento fiscal.
+Uma linha por venda cancelada. Considerar venda cancelada quando `fiscalXmlCancel` estiver preenchido ou quando for iFood com cancelamento operacional forte (`stateId = 4`, `VOID_AT` ou `MANUAL_CANCELLATION`). Eventos `VOID_PAID_ORDER` com `fiscalXmlCancel` preenchido devem atualizar a venda existente como cancelada; eventos `VOID_CURRENT_ORDER` nao entram aqui, salvo se no futuro vierem acompanhados de cancelamento fiscal.
 
 | Campo banco | Campo Kinesis / regra |
 |---|---|
