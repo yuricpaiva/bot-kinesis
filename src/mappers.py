@@ -46,7 +46,7 @@ def map_order_picture(payload: dict[str, Any], timezone_name: str) -> MappedOrde
     tipo_pdv = to_text(props.get("POS_TYPE"))
     atendente = _attendant_name(payload.get("posUser"))
     fiscal_cancel = has_value(payload.get("fiscalXmlCancel"))
-    operational_cancel = _is_ifood_operational_cancel(payload, props)
+    operational_cancel = _is_operational_cancel(payload, props)
     cancelado = fiscal_cancel or operational_cancel
 
     venda = {
@@ -168,10 +168,7 @@ def _business_date(value: Any) -> date | None:
         return None
 
 
-def _is_ifood_operational_cancel(payload: dict[str, Any], props: dict[str, Any]) -> bool:
-    partner = (to_text(props.get("DISPLAY_PARTNER")) or to_text(props.get("PARTNER")) or "")
-    if partner.lower() != "ifood":
-        return False
+def _is_operational_cancel(payload: dict[str, Any], props: dict[str, Any]) -> bool:
     return (
         to_text(payload.get("stateId")) == "4"
         or has_value(props.get("VOID_AT"))
