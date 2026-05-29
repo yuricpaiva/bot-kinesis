@@ -33,6 +33,7 @@ def base_payload():
                 "name": "Produto teste",
                 "itemType": "PRODUCT",
                 "itemId": "1.10020",
+                "qty": 2,
                 "itemPrice": 14.9,
                 "tags": ["PLUFamilyGroup=BROWNIE"],
                 "customProperties": {"saleType": "EAT_IN"},
@@ -59,6 +60,7 @@ def test_venda_normal_gera_venda_pagamentos_e_produtos():
     assert len(mapped.pagamentos) == 1
     assert len(mapped.produtos) == 1
     assert mapped.produtos[0]["familia_item"] == "BROWNIE"
+    assert mapped.produtos[0]["quantidade"] == Decimal("2")
     assert mapped.produtos[0]["preco_item"] == Decimal("14.9")
 
 

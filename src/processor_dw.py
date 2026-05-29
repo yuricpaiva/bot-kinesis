@@ -250,6 +250,7 @@ def save_mapped_order(cur, mapped: MappedOrder) -> SaveResult:
                 item_type,
                 item_id,
                 familia_item,
+                quantidade,
                 preco_item
             )
             VALUES (
@@ -265,6 +266,7 @@ def save_mapped_order(cur, mapped: MappedOrder) -> SaveResult:
                 %(item_type)s,
                 %(item_id)s,
                 %(familia_item)s,
+                %(quantidade)s,
                 %(preco_item)s
             )
             """,

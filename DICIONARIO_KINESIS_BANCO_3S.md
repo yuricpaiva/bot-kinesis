@@ -540,6 +540,7 @@ Uma linha por item de `saleLines[]`.
 | itemType | `saleLines[].itemType` |
 | itemID | `saleLines[].itemId` |
 | familia do item | valor de `saleLines[].tags[]` com prefixo `PLUFamilyGroup=` |
+| quantidade | `saleLines[].qty` |
 | preco_item | `saleLines[].itemPrice` |
 
 ### Tabela `cancelamentos`

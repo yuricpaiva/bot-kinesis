@@ -114,6 +114,7 @@ def _map_produtos(
                 "item_type": to_text(line.get("itemType")),
                 "item_id": to_text(line.get("itemId")),
                 "familia_item": extract_family(line.get("tags")),
+                "quantidade": to_decimal(line.get("qty")),
                 "preco_item": to_decimal(line.get("itemPrice")),
             }
         )
