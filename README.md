@@ -139,7 +139,6 @@ Nao usar `FISCAL_ID`, `numero_cupom`, `businessDt` ou `data_negocio` como chave 
 - Antes de recriar produtos: `DELETE FROM dw.produtos WHERE venda_id = ?`.
 - `VOID_CURRENT_ORDER` e ignorado no DW e marcado como processado na RAW.
 - `VOID_PAID_ORDER` com `fiscalXmlCancel` marca venda como cancelada.
-- Cancelamento operacional forte (`stateId = 4`, `VOID_AT` ou `MANUAL_CANCELLATION`) marca venda como cancelada mesmo sem `fiscalXmlCancel`.
 - Cancelamento tem precedencia: `cancelado=true` nunca volta para `false`.
 - Datas do DW sempre usam timezone `America/Fortaleza` via timezone real.
 

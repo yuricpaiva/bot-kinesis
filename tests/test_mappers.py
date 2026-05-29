@@ -103,47 +103,6 @@ def test_void_paid_order_com_fiscal_cancel_marca_cancelado():
     assert mapped.cancelamento["numero_cupom"] == "12345"
 
 
-def test_state_4_sem_cancelamento_fiscal_marca_cancelado_operacional():
-    payload = base_payload()
-    payload["stateId"] = 4
-    payload["fiscalXmlCancel"] = None
-
-    mapped = map_order_picture(payload, TZ)
-
-    assert mapped.skip_dw is False
-    assert mapped.venda["cancelado"] is True
-    assert mapped.produtos == []
-    assert mapped.cancelamento is not None
-
-
-def test_ifood_state_5_com_remote_order_status_5_nao_cancela_sozinho():
-    payload = base_payload()
-    payload["stateId"] = 5
-    payload["customProperties"]["DISPLAY_PARTNER"] = "ifood"
-    payload["customProperties"]["PARTNER"] = "ifood"
-    payload["customProperties"]["POS_TYPE"] = "DL"
-    payload["customProperties"]["REMOTE_ORDER_STATUS"] = "5"
-    payload["fiscalXmlCancel"] = None
-
-    mapped = map_order_picture(payload, TZ)
-
-    assert mapped.venda["cancelado"] is False
-    assert len(mapped.produtos) == 1
-    assert mapped.cancelamento is None
-
-
-def test_void_at_sem_ifood_tambem_cancela_operacionalmente():
-    payload = base_payload()
-    payload["stateId"] = 5
-    payload["customProperties"]["PARTNER"] = "99 Food"
-    payload["customProperties"]["VOID_AT"] = "2026-05-14T12:00:00"
-
-    mapped = map_order_picture(payload, TZ)
-
-    assert mapped.venda["cancelado"] is True
-    assert mapped.produtos == []
-
-
 def test_total_venda_usa_vnf_do_xml_fiscal():
     payload = base_payload()
     payload["totalAmount"] = 88.88
