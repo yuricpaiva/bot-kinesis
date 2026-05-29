@@ -144,8 +144,8 @@ Criar uma linha por item de `saleLines[]`.
 | itemType | `saleLines[].itemType` | Ex.: `PRODUCT`, `COMBO`, `OPTION`, `CANADD`. |
 | itemID | `saleLines[].itemId` | Identificador/caminho pelo qual o item foi acessado. |
 | família do item | `saleLines[].tags` com prefixo `PLUFamilyGroup=` | Extrair somente o valor após `=`. |
-| quantidade | `saleLines[].qty` | Quantidade do item. |
-| quantidade multiplicada | `saleLines[].multipliedQty` | Útil em combos/adicionais. |
+| quantidade | `saleLines[].multipliedQty` | Quantidade efetiva do item, ja multiplicada em combos/adicionais. |
+| quantidade original | `saleLines[].qty` | Quantidade direta da linha no pedido. |
 | preco_item | `saleLines[].itemPrice` | Valor total decimal da linha do item; gravar NULL quando ausente/nulo. |
 | preço item | `saleLines[].itemPrice` | Valor do item. |
 | preço unitário | `saleLines[].unitPrice` | Valor unitário. |
@@ -540,7 +540,7 @@ Uma linha por item de `saleLines[]`.
 | itemType | `saleLines[].itemType` |
 | itemID | `saleLines[].itemId` |
 | familia do item | valor de `saleLines[].tags[]` com prefixo `PLUFamilyGroup=` |
-| quantidade | `saleLines[].qty` |
+| quantidade | `saleLines[].multipliedQty` |
 | preco_item | `saleLines[].itemPrice` |
 
 ### Tabela `cancelamentos`
