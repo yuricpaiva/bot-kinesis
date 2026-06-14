@@ -1,7 +1,9 @@
 import argparse
 import logging
 import time
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from psycopg.types.json import Jsonb
 
@@ -56,6 +58,13 @@ def main() -> None:
         help="Le ate alcancar o fim do stream e encerra. Use com SHARD_ITERATOR_TYPE=TRIM_HORIZON.",
     )
     parser.add_argument(
+        "--from-timestamp",
+        help=(
+            "Le a partir de uma data/hora usando AT_TIMESTAMP. "
+            "Se nao houver fuso, usa BUSINESS_TIMEZONE."
+        ),
+    )
+    parser.add_argument(
         "--caught-up-idle-rounds",
         type=int,
         default=DEFAULT_CAUGHT_UP_IDLE_ROUNDS,
@@ -66,12 +75,23 @@ def main() -> None:
     collect_raw(
         until_caught_up=args.until_caught_up,
         caught_up_idle_rounds=args.caught_up_idle_rounds,
+        from_timestamp=args.from_timestamp,
     )
 
 
-def collect_raw(until_caught_up: bool = False, caught_up_idle_rounds: int = DEFAULT_CAUGHT_UP_IDLE_ROUNDS) -> None:
+def collect_raw(
+    until_caught_up: bool = False,
+    caught_up_idle_rounds: int = DEFAULT_CAUGHT_UP_IDLE_ROUNDS,
+    from_timestamp: str | None = None,
+) -> None:
     config = load_config()
     kinesis_client = create_client(config.kinesis)
+    iterator_type = config.kinesis.shard_iterator_type
+    iterator_timestamp = None
+    if from_timestamp:
+        iterator_type = "AT_TIMESTAMP"
+        iterator_timestamp = _parse_iterator_timestamp(from_timestamp, config.timezone_name)
+        LOGGER.info("Collector RAW usando AT_TIMESTAMP=%s.", iterator_timestamp.isoformat())
     summary = describe_stream(kinesis_client, config.kinesis.stream_name)
     LOGGER.info(
         "Stream encontrado: %s status=%s shards=%s",
@@ -85,7 +105,8 @@ def collect_raw(until_caught_up: bool = False, caught_up_idle_rounds: int = DEFA
             kinesis_client,
             config.kinesis.stream_name,
             shard["ShardId"],
-            config.kinesis.shard_iterator_type,
+            iterator_type,
+            iterator_timestamp,
         )
         for shard in shards
     }
@@ -170,6 +191,16 @@ def _json_safe(value: Any) -> Any:
     if isinstance(value, bytes):
         return value.decode("utf-8", errors="replace")
     return value
+
+
+def _parse_iterator_timestamp(value: str, timezone_name: str) -> datetime:
+    normalized = value.strip()
+    if normalized.endswith("Z"):
+        normalized = f"{normalized[:-1]}+00:00"
+    parsed = datetime.fromisoformat(normalized)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=ZoneInfo(timezone_name))
+    return parsed
 
 
 if __name__ == "__main__":

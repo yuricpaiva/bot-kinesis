@@ -61,6 +61,8 @@ def test_venda_normal_gera_venda_pagamentos_e_produtos():
     assert mapped.venda["cancelado"] is False
     assert len(mapped.pagamentos) == 1
     assert len(mapped.produtos) == 1
+    assert str(mapped.pagamentos[0]["business_date"]) == "2026-05-14"
+    assert str(mapped.produtos[0]["business_date"]) == "2026-05-14"
     assert mapped.produtos[0]["familia_item"] == "BROWNIE"
     assert mapped.produtos[0]["quantidade"] == Decimal("4")
     assert mapped.produtos[0]["preco_item"] == Decimal("14.9")
@@ -98,9 +100,64 @@ def test_void_paid_order_com_fiscal_cancel_marca_cancelado():
 
     assert mapped.skip_dw is False
     assert mapped.venda["cancelado"] is True
+    assert mapped.pagamentos == []
     assert mapped.produtos == []
     assert mapped.cancelamento is not None
     assert mapped.cancelamento["numero_cupom"] == "12345"
+    assert str(mapped.cancelamento["business_date"]) == "2026-05-14"
+
+
+def test_state_4_sem_cancelamento_fiscal_marca_cancelado_operacional():
+    payload = base_payload()
+    payload["stateId"] = 4
+    payload["fiscalXmlCancel"] = None
+
+    mapped = map_order_picture(payload, TZ)
+
+    assert mapped.skip_dw is False
+    assert mapped.venda["cancelado"] is True
+    assert mapped.pagamentos == []
+    assert mapped.produtos == []
+    assert mapped.cancelamento is not None
+
+
+def test_void_at_marca_cancelado_operacional():
+    payload = base_payload()
+    payload["stateId"] = 5
+    payload["customProperties"]["VOID_AT"] = "2026-05-14T12:00:00"
+
+    mapped = map_order_picture(payload, TZ)
+
+    assert mapped.venda["cancelado"] is True
+    assert mapped.pagamentos == []
+    assert mapped.produtos == []
+    assert mapped.cancelamento is not None
+
+
+def test_manual_cancellation_marca_cancelado_operacional():
+    payload = base_payload()
+    payload["stateId"] = 5
+    payload["customProperties"]["MANUAL_CANCELLATION"] = "2026/05/14 12:00:00"
+
+    mapped = map_order_picture(payload, TZ)
+
+    assert mapped.venda["cancelado"] is True
+    assert mapped.pagamentos == []
+    assert mapped.produtos == []
+    assert mapped.cancelamento is not None
+
+
+def test_remote_order_status_5_nao_cancela_sozinho():
+    payload = base_payload()
+    payload["stateId"] = 5
+    payload["customProperties"]["REMOTE_ORDER_STATUS"] = "5"
+
+    mapped = map_order_picture(payload, TZ)
+
+    assert mapped.venda["cancelado"] is False
+    assert len(mapped.pagamentos) == 1
+    assert len(mapped.produtos) == 1
+    assert mapped.cancelamento is None
 
 
 def test_total_venda_usa_vnf_do_xml_fiscal():
@@ -144,6 +201,8 @@ def test_sem_business_dt_nao_impede_chave_operacional():
     assert mapped.skip_dw is False
     assert str(mapped.venda["data_movimento"]) == "2026-05-13"
     assert mapped.venda["data_negocio"] is None
+    assert mapped.pagamentos[0]["business_date"] is None
+    assert mapped.produtos[0]["business_date"] is None
 
 
 def test_sem_creation_dttm_ignora_por_chave_incompleta():

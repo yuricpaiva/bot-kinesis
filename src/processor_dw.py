@@ -94,8 +94,9 @@ RETURNING id, (xmax::text = '0') AS inserted, cancelado
 
 @dataclass(frozen=True)
 class SaveResult:
-    venda_id: int
+    venda_id: int | None
     venda_inserted: bool
+    venda_removed: bool
     pagamentos_removed: int
     pagamentos_inserted: int
     produtos_removed: int
@@ -178,7 +179,10 @@ def process_one(conn, raw_id: int, timezone_name: str) -> None:
         cur.execute(MARK_PROCESSED_SQL, (raw_id,))
         conn.commit()
         venda = mapped.venda or {}
-        action = "inserida" if result.venda_inserted else "atualizada"
+        if result.venda_removed:
+            action = "removida por cancelamento"
+        else:
+            action = "inserida" if result.venda_inserted else "atualizada"
         LOGGER.info(
             "RAW id=%s processado no DW: venda_id=%s venda=%s "
             "loja=%s data_movimento=%s numero_pedido=%s "
@@ -203,6 +207,9 @@ def process_one(conn, raw_id: int, timezone_name: str) -> None:
 def save_mapped_order(cur, mapped: MappedOrder) -> SaveResult:
     if mapped.venda is None:
         raise ValueError("Mapeamento sem venda para salvar.")
+    if mapped.cancelamento is not None:
+        return _save_cancelled_order(cur, mapped)
+
     cur.execute(UPSERT_VENDA_SQL, mapped.venda)
     upserted_venda = cur.fetchone()
     venda_id = upserted_venda["id"]
@@ -217,6 +224,7 @@ def save_mapped_order(cur, mapped: MappedOrder) -> SaveResult:
                 venda_id,
                 loja,
                 data_hora,
+                business_date,
                 numero_cupom,
                 numero_pedido,
                 forma_pagamento,
@@ -226,6 +234,7 @@ def save_mapped_order(cur, mapped: MappedOrder) -> SaveResult:
                 %(venda_id)s,
                 %(loja)s,
                 %(data_hora)s,
+                %(business_date)s,
                 %(numero_cupom)s,
                 %(numero_pedido)s,
                 %(forma_pagamento)s,
@@ -244,6 +253,7 @@ def save_mapped_order(cur, mapped: MappedOrder) -> SaveResult:
                 venda_id,
                 loja,
                 data_hora,
+                business_date,
                 numero_cupom,
                 numero_pedido,
                 tipo_venda,
@@ -260,6 +270,7 @@ def save_mapped_order(cur, mapped: MappedOrder) -> SaveResult:
                 %(venda_id)s,
                 %(loja)s,
                 %(data_hora)s,
+                %(business_date)s,
                 %(numero_cupom)s,
                 %(numero_pedido)s,
                 %(tipo_venda)s,
@@ -276,49 +287,127 @@ def save_mapped_order(cur, mapped: MappedOrder) -> SaveResult:
             {"venda_id": venda_id, **produto},
         )
 
-    cancelamentos_removed = 0
-    cancelamentos_inserted = 0
-    if mapped.cancelamento is not None:
-        cur.execute("DELETE FROM dw.cancelamentos WHERE venda_id = %s", (venda_id,))
-        cancelamentos_removed = _affected_rows(cur)
-        cur.execute(
-            """
-            INSERT INTO dw.cancelamentos (
-                venda_id,
-                loja,
-                data_hora,
-                numero_cupom,
-                numero_pedido,
-                tipo_venda,
-                tipo_pdv,
-                atendente,
-                total_venda
-            )
-            VALUES (
-                %(venda_id)s,
-                %(loja)s,
-                %(data_hora)s,
-                %(numero_cupom)s,
-                %(numero_pedido)s,
-                %(tipo_venda)s,
-                %(tipo_pdv)s,
-                %(atendente)s,
-                %(total_venda)s
-            )
-            """,
-            {"venda_id": venda_id, **mapped.cancelamento},
-        )
-        cancelamentos_inserted = 1
-
     return SaveResult(
         venda_id=venda_id,
         venda_inserted=venda_inserted,
+        venda_removed=False,
         pagamentos_removed=pagamentos_removed,
         pagamentos_inserted=len(mapped.pagamentos),
         produtos_removed=produtos_removed,
         produtos_inserted=len(mapped.produtos),
+        cancelamentos_removed=0,
+        cancelamentos_inserted=0,
+    )
+
+
+def _save_cancelled_order(cur, mapped: MappedOrder) -> SaveResult:
+    venda = mapped.venda
+    cancelamento = mapped.cancelamento
+    if venda is None or cancelamento is None:
+        raise ValueError("Cancelamento sem dados da venda.")
+
+    cur.execute(
+        """
+        SELECT id
+        FROM dw.vendas
+        WHERE loja = %(loja)s
+          AND numero_pedido = %(numero_pedido)s
+          AND (
+              (CAST(%(numero_cupom)s AS text) IS NOT NULL
+               AND numero_cupom = CAST(%(numero_cupom)s AS text))
+              OR (CAST(%(data_negocio)s AS date) IS NOT NULL
+                  AND data_negocio = CAST(%(data_negocio)s AS date))
+              OR data_movimento BETWEEN CAST(%(data_movimento)s AS date) - 1
+                                     AND CAST(%(data_movimento)s AS date)
+          )
+        ORDER BY
+            CASE
+                WHEN CAST(%(numero_cupom)s AS text) IS NOT NULL
+                 AND numero_cupom = CAST(%(numero_cupom)s AS text) THEN 0
+                ELSE 1
+            END,
+            CASE
+                WHEN CAST(%(data_negocio)s AS date) IS NOT NULL
+                 AND data_negocio = CAST(%(data_negocio)s AS date) THEN 0
+                ELSE 1
+            END,
+            ABS(data_movimento - CAST(%(data_movimento)s AS date)),
+            id DESC
+        LIMIT 1
+        FOR UPDATE
+        """,
+        venda,
+    )
+    existing = cur.fetchone()
+    venda_id = existing["id"] if existing is not None else None
+
+    cur.execute(
+        """
+        DELETE FROM dw.cancelamentos
+        WHERE loja = %(loja)s
+          AND numero_pedido = %(numero_pedido)s
+          AND (
+              (CAST(%(numero_cupom)s AS text) IS NOT NULL
+               AND numero_cupom = CAST(%(numero_cupom)s AS text))
+              OR DATE(data_hora) BETWEEN CAST(%(data_movimento)s AS date) - 1
+                                     AND CAST(%(data_movimento)s AS date) + 1
+          )
+        """,
+        venda,
+    )
+    cancelamentos_removed = _affected_rows(cur)
+
+    pagamentos_removed = 0
+    produtos_removed = 0
+    venda_removed = False
+    if venda_id is not None:
+        cur.execute("DELETE FROM dw.pagamentos WHERE venda_id = %s", (venda_id,))
+        pagamentos_removed = _affected_rows(cur)
+        cur.execute("DELETE FROM dw.produtos WHERE venda_id = %s", (venda_id,))
+        produtos_removed = _affected_rows(cur)
+        cur.execute("DELETE FROM dw.vendas WHERE id = %s", (venda_id,))
+        venda_removed = _affected_rows(cur) > 0
+
+    cur.execute(
+        """
+        INSERT INTO dw.cancelamentos (
+            venda_id,
+            loja,
+            data_hora,
+            business_date,
+            numero_cupom,
+            numero_pedido,
+            tipo_venda,
+            tipo_pdv,
+            atendente,
+            total_venda
+        )
+        VALUES (
+            NULL,
+            %(loja)s,
+            %(data_hora)s,
+            %(business_date)s,
+            %(numero_cupom)s,
+            %(numero_pedido)s,
+            %(tipo_venda)s,
+            %(tipo_pdv)s,
+            %(atendente)s,
+            %(total_venda)s
+        )
+        """,
+        cancelamento,
+    )
+
+    return SaveResult(
+        venda_id=venda_id,
+        venda_inserted=False,
+        venda_removed=venda_removed,
+        pagamentos_removed=pagamentos_removed,
+        pagamentos_inserted=0,
+        produtos_removed=produtos_removed,
+        produtos_inserted=0,
         cancelamentos_removed=cancelamentos_removed,
-        cancelamentos_inserted=cancelamentos_inserted,
+        cancelamentos_inserted=1,
     )
 
 

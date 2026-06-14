@@ -45,13 +45,17 @@ def get_shard_iterator(
     stream_name: str,
     shard_id: str,
     iterator_type: str,
+    timestamp=None,
 ) -> str:
+    params = {
+        "StreamName": stream_name,
+        "ShardId": shard_id,
+        "ShardIteratorType": iterator_type,
+    }
+    if timestamp is not None:
+        params["Timestamp"] = timestamp
     try:
-        response = kinesis_client.get_shard_iterator(
-            StreamName=stream_name,
-            ShardId=shard_id,
-            ShardIteratorType=iterator_type,
-        )
+        response = kinesis_client.get_shard_iterator(**params)
     except ClientError as exc:
         _raise_friendly_error(exc, "GetShardIterator")
     return response["ShardIterator"]

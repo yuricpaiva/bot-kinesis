@@ -46,6 +46,8 @@ def map_order_picture(payload: dict[str, Any], timezone_name: str) -> MappedOrde
     tipo_pdv = to_text(props.get("POS_TYPE"))
     atendente = _attendant_name(payload.get("posUser"))
     fiscal_cancel = has_value(payload.get("fiscalXmlCancel"))
+    operational_cancel = _is_operational_cancel(payload, props)
+    cancelado = fiscal_cancel or operational_cancel
 
     venda = {
         "loja": loja,
@@ -60,12 +62,12 @@ def map_order_picture(payload: dict[str, Any], timezone_name: str) -> MappedOrde
         "total_venda": _total_venda_from_xml(payload),
         "desconto": to_decimal(payload.get("discountAmount")),
         "codigo_desconto": join_benefit_codes(payload.get("benefitData")),
-        "cancelado": fiscal_cancel,
+        "cancelado": cancelado,
     }
 
-    pagamentos = _map_pagamentos(tenders, venda)
-    produtos = [] if fiscal_cancel else _map_produtos(sale_lines, venda, tipo_pdv)
-    cancelamento = _map_cancelamento(venda) if fiscal_cancel else None
+    pagamentos = [] if cancelado else _map_pagamentos(tenders, venda)
+    produtos = [] if cancelado else _map_produtos(sale_lines, venda, tipo_pdv)
+    cancelamento = _map_cancelamento(venda) if cancelado else None
     return MappedOrder(False, None, venda, pagamentos, produtos, cancelamento)
 
 
@@ -80,6 +82,7 @@ def _map_pagamentos(tenders: Any, venda: dict[str, Any]) -> list[dict[str, Any]]
             {
                 "loja": venda["loja"],
                 "data_hora": venda["data_hora"],
+                "business_date": venda["data_negocio"],
                 "numero_cupom": venda["numero_cupom"],
                 "numero_pedido": venda["numero_pedido"],
                 "forma_pagamento": to_text(tender.get("tenderDesc")),
@@ -108,6 +111,7 @@ def _map_produtos(
             {
                 "loja": venda["loja"],
                 "data_hora": venda["data_hora"],
+                "business_date": venda["data_negocio"],
                 "numero_cupom": venda["numero_cupom"],
                 "numero_pedido": venda["numero_pedido"],
                 "tipo_venda": line_sale_type,
@@ -128,6 +132,7 @@ def _map_cancelamento(venda: dict[str, Any]) -> dict[str, Any]:
     return {
         "loja": venda["loja"],
         "data_hora": venda["data_hora"],
+        "business_date": venda["data_negocio"],
         "numero_cupom": venda["numero_cupom"],
         "numero_pedido": venda["numero_pedido"],
         "tipo_venda": venda["tipo_venda"],
@@ -164,3 +169,11 @@ def _business_date(value: Any) -> date | None:
         return date.fromisoformat(text[:10])
     except ValueError:
         return None
+
+
+def _is_operational_cancel(payload: dict[str, Any], props: dict[str, Any]) -> bool:
+    return (
+        to_text(payload.get("stateId")) == "4"
+        or has_value(props.get("VOID_AT"))
+        or has_value(props.get("MANUAL_CANCELLATION"))
+    )

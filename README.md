@@ -107,6 +107,11 @@ bash scripts/run_kinesis_nightly.sh
 - grava `error_message` quando falhar;
 - nao acessa o Kinesis.
 
+Cancelamentos fiscais ou operacionais (`stateId = 4`, `VOID_AT` ou
+`MANUAL_CANCELLATION`) ficam somente em `dw.cancelamentos`. Quando a venda ja
+existe, o processor remove seus pagamentos, produtos e a propria linha de
+`dw.vendas` antes de gravar o cancelamento.
+
 ## Chave da Venda
 
 No DW, a venda e identificada por:
@@ -125,6 +130,8 @@ numero_pedido = orderCode
 ```
 
 `data_negocio` guarda `businessDt` sem conversao de fuso, apenas como data operacional complementar.
+O mesmo valor alimenta `business_date` em `dw.pagamentos`, `dw.produtos` e
+`dw.cancelamentos`.
 
 Nao usar `FISCAL_ID`, `numero_cupom`, `businessDt` ou `data_negocio` como chave principal da venda.
 
