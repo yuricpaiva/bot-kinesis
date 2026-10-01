@@ -133,6 +133,10 @@ numero_pedido = orderCode
 O mesmo valor alimenta `business_date` em `dw.pagamentos`, `dw.produtos` e
 `dw.cancelamentos`.
 
+`tipo_atendimento` guarda `podType` sem substituir `tipo_pdv`. Vendas de mesa
+chegam com `podType = TS`. `valor_gorjeta` usa `customProperties.TIP_AMOUNT` e,
+quando esse campo nao existe, usa `tip` como fallback.
+
 Nao usar `FISCAL_ID`, `numero_cupom`, `businessDt` ou `data_negocio` como chave principal da venda.
 
 `FISCAL_ID` alimenta `numero_cupom`, mas pode nascer vazio e aparecer depois.

@@ -76,11 +76,8 @@ Em pedidos iFood, os campos `DISPLAY_PARTNER` e `PARTNER` aparecem como `ifood`.
 
 ### Tipo de PDV
 
-Ordem sugerida:
-
-1. `customProperties.POS_TYPE`
-2. `podType`
-3. `posCode`
+O campo `tipo_pdv` usa `customProperties.POS_TYPE`. O valor de `podType` tem
+semantica diferente e deve ser preservado em `tipo_atendimento`.
 
 ## Tabela `venda`
 
@@ -93,7 +90,9 @@ Ordem sugerida:
 | numero do cupom | `customProperties.FISCAL_ID` | Cupom fiscal/NFC-e. |
 | numero do pedido | `orderCode` | Identificador interno da venda. |
 | canal de venda | `customProperties.DISPLAY_PARTNER` / `customProperties.PARTNER` / `saleLines[0].customProperties.saleType` | Ver regra de canal. |
-| tipo de pdv | `customProperties.POS_TYPE` / `podType` / `posCode` | Ver regra de tipo de PDV. |
+| tipo de pdv | `customProperties.POS_TYPE` | Classificacao do PDV, separada do tipo de atendimento. |
+| tipo de atendimento | `podType` | Preserva `TS` para vendas de mesa sem substituir `tipo de pdv`. |
+| valor da gorjeta | `customProperties.TIP_AMOUNT` / `tip` | Usa `TIP_AMOUNT` e recorre a `tip` quando ausente. |
 | atendente | `posUser` | Nome/login do atendente quando disponível. |
 | atendente_id | `posUserId` | Código do atendente. |
 | total de venda | `totalAfterDiscount` | Total líquido após desconto. |
@@ -520,6 +519,8 @@ Uma linha por venda/evento `order_picture`, exceto eventos cancelados e
 | numero do cupom | `customProperties.FISCAL_ID` |
 | tipo de venda | primeiro valor encontrado em `saleLines[].customProperties.saleType` |
 | tipo de pdv | `customProperties.POS_TYPE` |
+| tipo de atendimento | `podType` |
+| valor da gorjeta | `customProperties.TIP_AMOUNT`, com fallback para `tip` |
 | atendente | `posUser.name` |
 | total de venda | `vNF` dentro do XML fiscal (`fiscalXml`) |
 | desconto | `discountAmount` |

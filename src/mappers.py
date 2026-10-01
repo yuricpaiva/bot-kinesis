@@ -44,6 +44,10 @@ def map_order_picture(payload: dict[str, Any], timezone_name: str) -> MappedOrde
 
     tipo_venda = first_sale_type(sale_lines)
     tipo_pdv = to_text(props.get("POS_TYPE"))
+    tipo_atendimento = to_text(payload.get("podType"))
+    tip_amount = props.get("TIP_AMOUNT")
+    if not has_value(tip_amount):
+        tip_amount = payload.get("tip")
     atendente = _attendant_name(payload.get("posUser"))
     fiscal_cancel = has_value(payload.get("fiscalXmlCancel"))
     operational_cancel = _is_operational_cancel(payload, props)
@@ -58,6 +62,8 @@ def map_order_picture(payload: dict[str, Any], timezone_name: str) -> MappedOrde
         "numero_pedido": numero_pedido,
         "tipo_venda": tipo_venda,
         "tipo_pdv": tipo_pdv,
+        "tipo_atendimento": tipo_atendimento,
+        "valor_gorjeta": to_decimal(tip_amount),
         "atendente": atendente,
         "total_venda": _total_venda_from_xml(payload),
         "desconto": to_decimal(payload.get("discountAmount")),

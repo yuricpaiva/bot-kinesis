@@ -54,6 +54,8 @@ def test_venda_normal_gera_venda_pagamentos_e_produtos():
     assert mapped.venda["numero_pedido"] == "10609"
     assert mapped.venda["tipo_venda"] == "EAT_IN"
     assert mapped.venda["tipo_pdv"] == "FC"
+    assert mapped.venda["tipo_atendimento"] is None
+    assert mapped.venda["valor_gorjeta"] is None
     assert mapped.venda["atendente"] == "Operador"
     assert mapped.venda["total_venda"] == Decimal("24.43")
     assert mapped.venda["desconto"] == Decimal("1.5")
@@ -66,6 +68,27 @@ def test_venda_normal_gera_venda_pagamentos_e_produtos():
     assert mapped.produtos[0]["familia_item"] == "BROWNIE"
     assert mapped.produtos[0]["quantidade"] == Decimal("4")
     assert mapped.produtos[0]["preco_item"] == Decimal("14.9")
+
+
+def test_venda_mesa_mapeia_tipo_atendimento_e_gorjeta():
+    payload = base_payload()
+    payload["podType"] = "TS"
+    payload["tip"] = 0
+    payload["customProperties"]["TIP_AMOUNT"] = "5.10"
+
+    mapped = map_order_picture(payload, TZ)
+
+    assert mapped.venda["tipo_atendimento"] == "TS"
+    assert mapped.venda["valor_gorjeta"] == Decimal("5.10")
+
+
+def test_gorjeta_usa_campo_tip_quando_tip_amount_ausente():
+    payload = base_payload()
+    payload["tip"] = 2.75
+
+    mapped = map_order_picture(payload, TZ)
+
+    assert mapped.venda["valor_gorjeta"] == Decimal("2.75")
 
 
 def test_produto_sem_item_price_grava_preco_item_nulo():

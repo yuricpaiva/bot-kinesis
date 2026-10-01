@@ -106,6 +106,8 @@ def test_save_mapped_order_substitui_filhos_quando_mesma_venda_chega_de_novo():
         UPSERT_VENDA_SQL.split()
     )
     assert "data_negocio" in " ".join(UPSERT_VENDA_SQL.split())
+    assert "tipo_atendimento" in " ".join(UPSERT_VENDA_SQL.split())
+    assert "valor_gorjeta" in " ".join(UPSERT_VENDA_SQL.split())
     assert second_upsert_index < second_delete_pagamentos_index
     assert second_delete_pagamentos_index < second_insert_pagamento_index
     assert second_upsert_index < second_delete_produtos_index
